@@ -1320,8 +1320,8 @@ export default function AACCommunicationTool() {
         <div className="flex-1 overflow-auto">
           {currentPage === 'main' ? (
             <>
-              {/* Categories Grid - 2 columns */}
-              <div className="grid grid-cols-2 gap-6 mb-8">
+              {/* Categories Grid - 3 columns */}
+              <div className="grid grid-cols-3 gap-4 mb-8">
                 {getSortedCategories().map(category => (
                   <button
                     key={category.id}
@@ -1347,17 +1347,17 @@ export default function AACCommunicationTool() {
                         clearTimeout(e.target.longPressTimer);
                       }
                     }}
-                    className={`${getCategoryColor(category)} rounded-2xl shadow-lg p-2 flex flex-col items-center hover:shadow-xl transition border-4 aspect-square relative`}
+                    className={`${getCategoryColor(category)} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 h-48 relative`}
                   >
                     {isCategoryFavorite(category.id) && (
-                      <span className="absolute top-2 right-2 text-2xl">⭐</span>
+                      <span className="absolute top-2 right-2 text-xl">⭐</span>
                     )}
-                    <div className="flex items-start justify-center">
+                    <div className="flex items-center justify-center flex-1">
                       {renderTileImage(category)}
                     </div>
-                    <span className={`text-lg font-bold absolute bottom-3 ${settings.highContrast ? 'text-white' : 'text-gray-800'}`}>{category.name}</span>
+                    <span className={`text-lg font-bold mt-2 ${settings.highContrast ? 'text-white' : 'text-gray-800'}`}>{category.name}</span>
                     {currentSelections[category.id] && (
-                      <span className="mt-1 text-sm text-green-600 font-medium">
+                      <span className="text-xs text-green-600 font-medium">
                         ✓ {currentSelections[category.id].name}
                       </span>
                     )}
@@ -1412,9 +1412,9 @@ export default function AACCommunicationTool() {
               )}
             </>
           ) : (
-            // Tiles Grid - 2 columns
+            // Tiles Grid - 3 columns
             <div className="flex flex-col h-full">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-4">
                 {getSortedTiles(selectedCategory).map(tile => (
                   <button
                     key={tile.id}
@@ -1436,19 +1436,19 @@ export default function AACCommunicationTool() {
                         clearTimeout(e.target.longPressTimer);
                       }
                     }}
-                    className={`${cardStyle} rounded-2xl shadow-lg p-2 flex flex-col items-center hover:shadow-xl transition border-4 aspect-square relative ${
+                    className={`${cardStyle} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 h-48 relative ${
                       currentSelections[selectedCategory]?.id === tile.id 
                         ? 'border-green-400 bg-green-50' 
                         : 'border-transparent hover:border-blue-300'
                     }`}
                   >
                     {isTileFavorite(selectedCategory, tile.id) && (
-                      <span className="absolute top-2 right-2 text-2xl">⭐</span>
+                      <span className="absolute top-2 right-2 text-xl">⭐</span>
                     )}
-                    <div className="flex items-start justify-center">
+                    <div className="flex items-center justify-center flex-1">
                       {renderTileImage(tile)}
                     </div>
-                    <span className={`text-lg font-bold absolute bottom-3 ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{tile.name}</span>
+                    <span className={`text-lg font-bold mt-2 ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{tile.name}</span>
                   </button>
                 ))}
               </div>
