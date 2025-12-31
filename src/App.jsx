@@ -1489,24 +1489,24 @@ export default function AACCommunicationTool() {
             </div>
           )}
         </div>
-
-        {/* Done Button */}
-        {currentPage === 'main' && (
-          <button
-            onClick={handleDone}
-            className="mt-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-10 px-20 rounded-2xl text-5xl font-bold hover:opacity-90 transition shadow-xl flex items-center justify-center gap-5"
-          >
-            <span className="text-7xl">🏁</span> Done
-          </button>
-        )}
       </div>
 
       {/* Right Section - 1/3 History */}
-      <div className={`w-1/3 p-6 relative z-10 ${cardStyle}`}>
+      <div className={`w-1/3 p-6 relative z-10 flex flex-col ${cardStyle}`}>
+        {/* Done Button at top */}
+        {currentPage === 'main' && (
+          <button
+            onClick={handleDone}
+            className="mb-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-6 px-8 rounded-2xl text-3xl font-bold hover:opacity-90 transition shadow-xl flex items-center justify-center gap-3"
+          >
+            <span className="text-5xl">🏁</span> Done
+          </button>
+        )}
+        
         <h2 className="text-xl font-semibold text-gray-400 mb-2">History</h2>
         <div className="border-b-2 border-gray-800 mb-4"></div>
         
-        <div className="space-y-2 mb-4">
+        <div className="space-y-2 mb-4 flex-1 overflow-auto">
           {history.map((sentence, idx) => (
             <p key={idx} className="text-gray-400 text-lg">{sentence}</p>
           ))}
