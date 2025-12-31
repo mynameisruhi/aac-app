@@ -1518,8 +1518,6 @@ export default function AACCommunicationTool() {
         
         <div className="border-b-2 border-black mb-4"></div>
         
-        <h2 className="text-xl font-semibold text-gray-400 mb-2">History</h2>
-        
         <div className="space-y-2 flex-1 overflow-auto">
           {[...history].reverse().map((sentence, idx) => (
             <p key={idx} className="text-gray-400 text-lg">{sentence}</p>
