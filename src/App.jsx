@@ -1504,10 +1504,17 @@ export default function AACCommunicationTool() {
         )}
         
         <h2 className="text-xl font-semibold text-gray-400 mb-2">History</h2>
+        
+        <div className="space-y-2 flex-1 overflow-auto mb-4">
+          {history.map((sentence, idx) => (
+            <p key={idx} className="text-gray-400 text-lg">{sentence}</p>
+          ))}
+        </div>
+        
         <div className="border-b-2 border-black mb-4"></div>
         
         {currentSentence && (
-          <div className="flex items-start gap-2 mb-4">
+          <div className="flex items-start gap-2">
             <p className={`text-xl font-medium ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{currentSentence}</p>
             <button
               onClick={() => speak(currentSentence)}
@@ -1518,12 +1525,6 @@ export default function AACCommunicationTool() {
             </button>
           </div>
         )}
-        
-        <div className="space-y-2 flex-1 overflow-auto">
-          {history.map((sentence, idx) => (
-            <p key={idx} className="text-gray-400 text-lg">{sentence}</p>
-          ))}
-        </div>
       </div>
 
       {/* Password Verification Popup */}
