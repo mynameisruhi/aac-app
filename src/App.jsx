@@ -1347,7 +1347,7 @@ export default function AACCommunicationTool() {
                         clearTimeout(e.target.longPressTimer);
                       }
                     }}
-                    className={`${getCategoryColor(category)} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 h-48 relative`}
+                    className={`${getCategoryColor(category)} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 aspect-square relative`}
                   >
                     {isCategoryFavorite(category.id) && (
                       <span className="absolute top-2 right-2 text-xl">⭐</span>
@@ -1436,7 +1436,7 @@ export default function AACCommunicationTool() {
                         clearTimeout(e.target.longPressTimer);
                       }
                     }}
-                    className={`${cardStyle} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 h-48 relative ${
+                    className={`${cardStyle} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 aspect-square relative ${
                       currentSelections[selectedCategory]?.id === tile.id 
                         ? 'border-green-400 bg-green-50' 
                         : 'border-transparent hover:border-blue-300'
