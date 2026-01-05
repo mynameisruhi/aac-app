@@ -319,11 +319,15 @@ const migrateUserData = (userData) => {
               // Update existing default tiles with new properties (like fullPhrase for phrases)
               migratedData.tiles[categoryId] = migratedData.tiles[categoryId].map(tile => {
                 if (tile.id === defaultTile.id && tile.isDefault) {
-                  return {
+                  const updated = {
                     ...tile,
                     emoji: tile.customImage ? tile.emoji : defaultTile.emoji,
-                    fullPhrase: defaultTile.fullPhrase || tile.fullPhrase
                   };
+                  // Only add fullPhrase if the default tile has one (phrases category)
+                  if (defaultTile.fullPhrase) {
+                    updated.fullPhrase = defaultTile.fullPhrase;
+                  }
+                  return updated;
                 }
                 return tile;
               });
@@ -398,11 +402,31 @@ export default function AACCommunicationTool() {
 
   const audioContextRef = useRef(null);
 
+  // Utility function to remove undefined values (Firebase doesn't accept them)
+  const removeUndefinedValues = (obj) => {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj.map(item => removeUndefinedValues(item));
+    }
+    if (typeof obj === 'object') {
+      const cleaned = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = removeUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+    return obj;
+  };
+
   // Cloud sync functions
   const saveToCloud = async (username, data) => {
     try {
       const dataWithVersion = { ...data, schemaVersion: SCHEMA_VERSION };
-      await setDoc(doc(db, "users", username), dataWithVersion);
+      // Clean undefined values before saving
+      const cleanedData = removeUndefinedValues(dataWithVersion);
+      await setDoc(doc(db, "users", username), cleanedData);
       setSyncStatus('Saved ✓');
       setTimeout(() => setSyncStatus(''), 2000);
       return true;
