@@ -886,62 +886,124 @@ export default function AACCommunicationTool() {
     setPopup(null);
   };
 
-  const handleGenerateMoreTiles = async () => {
-    if (!selectedCategory || isGeneratingTiles) return;
-    
-    setIsGeneratingTiles(true);
-    
-    const category = categories.find(c => c.id === selectedCategory);
-    const existingTiles = tiles[selectedCategory] || [];
-    const existingNames = existingTiles.map(t => t.name).join(', ');
-    
-    try {
-      // Call your Vercel backend
-      const response = await fetch("https://aac-backend.vercel.app/api/generate-tiles", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          categoryName: category.name,
-          stem: category.stem,
-          existingTiles: existingNames || 'none'
-        })
+const BACKEND_URL =
+  import.meta?.env?.VITE_BACKEND_URL || "https://aac-backend.vercel.app";
+
+const handleGenerateMoreTiles = async () => {
+  if (!selectedCategory || isGeneratingTiles) return;
+
+  setIsGeneratingTiles(true);
+
+  const category = categories.find((c) => c.id === selectedCategory);
+  const existingTiles = tiles[selectedCategory] || [];
+  const existingNames = existingTiles.map((t) => t.name).join(", ");
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/generate-tiles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        categoryName: category?.name || "",
+        stem: category?.stem || "",
+        existingTiles: existingNames || "none",
+      }),
+    });
+
+    // Helpful error logging if backend fails
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("generate-tiles failed:", response.status, errText);
+      return;
+    }
+
+    // Try to parse JSON response, but be resilient
+    const contentType = response.headers.get("content-type") || "";
+    let payload;
+
+    if (contentType.includes("application/json")) {
+      payload = await response.json();
+    } else {
+      payload = await response.text();
+    }
+
+    // Normalize to an array of suggestions: [{name, emoji?}, ...]
+    let suggestionsArray = null;
+
+    // Case A: backend returns an array directly
+    if (Array.isArray(payload)) {
+      suggestionsArray = payload;
+    }
+
+    // Case B: backend returns { tiles: [...] }
+    if (!suggestionsArray && payload && Array.isArray(payload.tiles)) {
+      suggestionsArray = payload.tiles;
+    }
+
+    // Case C: backend returns { suggestions: [...] }
+    if (!suggestionsArray && payload && Array.isArray(payload.suggestions)) {
+      suggestionsArray = payload.suggestions;
+    }
+
+    // Case D: backend returns { text: "```json [...] ```" } OR { text: "[...]" }
+    if (!suggestionsArray && payload && typeof payload === "object" && typeof payload.text === "string") {
+      const cleaned = payload.text.replace(/```json|```/g, "").trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) suggestionsArray = parsed;
+      } catch (e) {
+        console.error("Could not JSON.parse(payload.text):", cleaned);
+      }
+    }
+
+    // Case E: backend returns plain text "```json [...]```" or "[...]"
+    if (!suggestionsArray && typeof payload === "string") {
+      const cleaned = payload.replace(/```json|```/g, "").trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) suggestionsArray = parsed;
+      } catch (e) {
+        console.error("Could not JSON.parse(text payload):", cleaned);
+      }
+    }
+
+    if (!Array.isArray(suggestionsArray)) {
+      console.error("No valid suggestions array returned from backend:", payload);
+      return;
+    }
+
+    const newTiles = suggestionsArray
+      .filter((s) => s && typeof s.name === "string" && s.name.trim().length > 0)
+      .map((suggestion, index) => {
+        const tile = {
+          id: `ai_${Date.now()}_${index}`,
+          name: suggestion.name.trim(),
+          emoji: suggestion.emoji || "📝",
+          isDefault: false,
+          isAIGenerated: true,
+        };
+
+        if (selectedCategory === "phrases") {
+          // Ensure a period at the end
+          const base = tile.name.replace(/\.+$/, "");
+          tile.fullPhrase = base + ".";
+        }
+
+        return tile;
       });
 
-      const data = await response.json();
-      const textContent = data.text || "";
-      
-      const cleanedText = textContent.replace(/```json|```/g, "").trim();
-      const newSuggestions = JSON.parse(cleanedText);
-      
-      if (Array.isArray(newSuggestions)) {
-        const newTiles = newSuggestions.map((suggestion, index) => {
-          const tile = {
-            id: `ai_${Date.now()}_${index}`,
-            name: suggestion.name,
-            emoji: suggestion.emoji || '📝',
-            isDefault: false,
-            isAIGenerated: true
-          };
-          // For phrases category, add fullPhrase with period format
-          if (selectedCategory === 'phrases') {
-            tile.fullPhrase = suggestion.name + '.';
-          }
-          return tile;
-        });
-        
-        setTiles(prev => ({
-          ...prev,
-          [selectedCategory]: [...(prev[selectedCategory] || []), ...newTiles]
-        }));
-      }
-    } catch (error) {
-      console.error("Error generating tiles:", error);
-    } finally {
-      setIsGeneratingTiles(false);
+    if (newTiles.length > 0) {
+      setTiles((prev) => ({
+        ...prev,
+        [selectedCategory]: [...(prev[selectedCategory] || []), ...newTiles],
+      }));
     }
-  };
+  } catch (error) {
+    console.error("Error generating tiles:", error);
+  } finally {
+    setIsGeneratingTiles(false);
+  }
+};
+
 
   const handleDeleteGeneratedTiles = () => {
     if (!selectedCategory) return;
