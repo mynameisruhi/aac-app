@@ -17,11 +17,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// ============================================
+// SCHEMA VERSION - INCREMENT WHEN YOU MAKE CHANGES
+// ============================================
+// When you add new default tiles, categories, settings, or change the data structure,
+// increment this number. The migration function will automatically update old accounts.
+const SCHEMA_VERSION = 2;
+
 // Theme Background Components
 const SpaceBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none">
     <div className="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-black" />
-    {/* Stars - static, no animation */}
     {[...Array(50)].map((_, i) => (
       <div
         key={`star-${i}`}
@@ -34,7 +40,6 @@ const SpaceBackground = () => (
         }}
       />
     ))}
-    {/* Planets */}
     <div className="absolute text-6xl" style={{ top: '10%', right: '10%' }}>🪐</div>
     <div className="absolute text-4xl" style={{ top: '30%', left: '5%' }}>🌙</div>
     <div className="absolute text-5xl" style={{ bottom: '20%', right: '15%' }}>🌍</div>
@@ -47,7 +52,6 @@ const SpaceBackground = () => (
 const OceanBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none">
     <div className="absolute inset-0 bg-gradient-to-b from-cyan-400 via-blue-500 to-blue-900" />
-    {/* Bubbles - static, no animation */}
     {[...Array(20)].map((_, i) => (
       <div
         key={`bubble-${i}`}
@@ -60,7 +64,6 @@ const OceanBackground = () => (
         }}
       />
     ))}
-    {/* Sea creatures */}
     <div className="absolute text-5xl" style={{ top: '20%', right: '10%' }}>🐠</div>
     <div className="absolute text-6xl" style={{ bottom: '15%', left: '10%' }}>🐙</div>
     <div className="absolute text-4xl" style={{ top: '50%', right: '20%' }}>🐡</div>
@@ -76,20 +79,9 @@ const OceanBackground = () => (
 const DinosaurBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none">
     <div className="absolute inset-0 bg-gradient-to-b from-green-400 via-green-600 to-green-900" />
-    {/* Trees/plants */}
     {[...Array(8)].map((_, i) => (
-      <div
-        key={`tree-${i}`}
-        className="absolute text-4xl"
-        style={{
-          left: (i * 12 + 5) + '%',
-          bottom: '5%'
-        }}
-      >
-        🌴
-      </div>
+      <div key={`tree-${i}`} className="absolute text-4xl" style={{ left: (i * 12 + 5) + '%', bottom: '5%' }}>🌴</div>
     ))}
-    {/* Dinosaurs */}
     <div className="absolute text-7xl" style={{ bottom: '10%', right: '10%' }}>🦕</div>
     <div className="absolute text-6xl" style={{ bottom: '15%', left: '15%' }}>🦖</div>
     <div className="absolute text-5xl" style={{ top: '20%', right: '20%' }}>🦅</div>
@@ -105,20 +97,9 @@ const DinosaurBackground = () => (
 const PrincessBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none">
     <div className="absolute inset-0 bg-gradient-to-b from-pink-300 via-purple-300 to-pink-400" />
-    {/* Sparkles - static, no animation */}
     {[...Array(30)].map((_, i) => (
-      <div
-        key={`sparkle-${i}`}
-        className="absolute text-xl"
-        style={{
-          left: Math.random() * 100 + '%',
-          top: Math.random() * 100 + '%',
-        }}
-      >
-        ✨
-      </div>
+      <div key={`sparkle-${i}`} className="absolute text-xl" style={{ left: Math.random() * 100 + '%', top: Math.random() * 100 + '%' }}>✨</div>
     ))}
-    {/* Princess items */}
     <div className="absolute text-6xl" style={{ top: '10%', right: '15%' }}>👑</div>
     <div className="absolute text-5xl" style={{ top: '25%', left: '10%' }}>🪄</div>
     <div className="absolute text-4xl" style={{ bottom: '20%', right: '10%' }}>💎</div>
@@ -155,6 +136,9 @@ const CATEGORY_COLORS_HIGH_CONTRAST = {
   phrases: 'bg-green-600 border-green-800 text-white'
 };
 
+// ============================================
+// DEFAULT DATA - Edit these to add new defaults
+// ============================================
 const INITIAL_CATEGORIES = [
   { id: 'phrases', name: 'Quick Phrases', emoji: '💬', isDefault: true, stem: '', color: 'green' },
   { id: 'actions', name: 'Actions', emoji: '✋', isDefault: true, stem: 'I want to ', color: 'blue' },
@@ -228,7 +212,13 @@ const INITIAL_TILES = {
   ]
 };
 
-// Word prediction patterns
+const DEFAULT_SETTINGS = {
+  soundEnabled: true,
+  highContrast: false,
+  theme: 'default',
+  voice: 'default'
+};
+
 const PREDICTION_PATTERNS = {
   'feelings::hungry': ['actions::eat', 'actions::drink', 'phrases::please'],
   'feelings::thirsty': ['actions::drink', 'phrases::please', 'actions::stop'],
@@ -266,6 +256,104 @@ const PASTEL_COLORS = [
   'bg-rose-100 border-rose-300'
 ];
 
+// ============================================
+// DATA MIGRATION FUNCTION
+// ============================================
+// This function automatically updates old accounts with new features
+// when they log in. It preserves user customizations while adding
+// any new default content.
+const migrateUserData = (userData) => {
+  const currentVersion = userData.schemaVersion || 1;
+  let migratedData = { ...userData };
+
+  // Already at current version - no migration needed
+  if (currentVersion >= SCHEMA_VERSION) {
+    return migratedData;
+  }
+
+  console.log(`Migrating user data from version ${currentVersion} to ${SCHEMA_VERSION}`);
+
+  // Migration from version 1 to 2 (and any version < 2)
+  if (currentVersion < 2) {
+    // Ensure categories object exists
+    if (!migratedData.categories) {
+      migratedData.categories = [...INITIAL_CATEGORIES];
+    } else {
+      // Add any missing default categories
+      const existingCategoryIds = migratedData.categories.map(c => c.id);
+      INITIAL_CATEGORIES.forEach(defaultCat => {
+        if (!existingCategoryIds.includes(defaultCat.id)) {
+          migratedData.categories.push({ ...defaultCat });
+        } else {
+          // Update existing default categories with any new properties (like stem changes)
+          migratedData.categories = migratedData.categories.map(cat => {
+            if (cat.id === defaultCat.id && cat.isDefault) {
+              return { 
+                ...cat, 
+                stem: defaultCat.stem,  // Update stem in case it changed
+                emoji: cat.customImage ? cat.emoji : defaultCat.emoji,  // Update emoji unless custom image
+                color: defaultCat.color 
+              };
+            }
+            return cat;
+          });
+        }
+      });
+    }
+
+    // Ensure tiles object exists
+    if (!migratedData.tiles) {
+      migratedData.tiles = JSON.parse(JSON.stringify(INITIAL_TILES));
+    } else {
+      // Add any missing default tiles to each category
+      Object.keys(INITIAL_TILES).forEach(categoryId => {
+        if (!migratedData.tiles[categoryId]) {
+          migratedData.tiles[categoryId] = [...INITIAL_TILES[categoryId]];
+        } else {
+          const existingTileIds = migratedData.tiles[categoryId].map(t => t.id);
+          INITIAL_TILES[categoryId].forEach(defaultTile => {
+            if (!existingTileIds.includes(defaultTile.id)) {
+              // Add missing default tile
+              migratedData.tiles[categoryId].push({ ...defaultTile });
+            } else {
+              // Update existing default tiles with new properties (like fullPhrase for phrases)
+              migratedData.tiles[categoryId] = migratedData.tiles[categoryId].map(tile => {
+                if (tile.id === defaultTile.id && tile.isDefault) {
+                  return {
+                    ...tile,
+                    emoji: tile.customImage ? tile.emoji : defaultTile.emoji,
+                    fullPhrase: defaultTile.fullPhrase || tile.fullPhrase
+                  };
+                }
+                return tile;
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Ensure settings have all required fields
+    migratedData.settings = {
+      ...DEFAULT_SETTINGS,
+      ...(migratedData.settings || {})
+    };
+
+    // Initialize missing data structures
+    if (!migratedData.tileUsage) migratedData.tileUsage = {};
+    if (!migratedData.favoriteCategories) migratedData.favoriteCategories = [];
+    if (!migratedData.favoriteTiles) migratedData.favoriteTiles = {};
+  }
+
+  // Future migrations go here:
+  // if (currentVersion < 3) { ... }
+
+  // Update schema version
+  migratedData.schemaVersion = SCHEMA_VERSION;
+
+  return migratedData;
+};
+
 export default function AACCommunicationTool() {
   const [currentPage, setCurrentPage] = useState('login');
   const [currentUser, setCurrentUser] = useState(null);
@@ -284,13 +372,9 @@ export default function AACCommunicationTool() {
   const [history, setHistory] = useState([]);
   const [currentSentence, setCurrentSentence] = useState('');
   const [isGeneratingTiles, setIsGeneratingTiles] = useState(false);
+  const [generationError, setGenerationError] = useState('');
   
-  const [settings, setSettings] = useState({
-    soundEnabled: true,
-    highContrast: false,
-    theme: 'default',
-    voice: 'default'
-  });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   
   const [tileUsage, setTileUsage] = useState({});
@@ -314,10 +398,11 @@ export default function AACCommunicationTool() {
 
   const audioContextRef = useRef(null);
 
-  // Cloud sync functions using Firebase
+  // Cloud sync functions
   const saveToCloud = async (username, data) => {
     try {
-      await setDoc(doc(db, "users", username), data);
+      const dataWithVersion = { ...data, schemaVersion: SCHEMA_VERSION };
+      await setDoc(doc(db, "users", username), dataWithVersion);
       setSyncStatus('Saved ✓');
       setTimeout(() => setSyncStatus(''), 2000);
       return true;
@@ -343,29 +428,20 @@ export default function AACCommunicationTool() {
 
   const playTapSound = () => {
     if (!settings.soundEnabled) return;
-    
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
       const ctx = audioContextRef.current;
-      
-      // Create a short click sound
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
-      
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
-      
-      // Click - short burst of noise-like sound
       oscillator.frequency.setValueAtTime(1800, ctx.currentTime);
       oscillator.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.02);
       oscillator.type = 'square';
-      
-      // Very short envelope for click
       gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-      
       oscillator.start(ctx.currentTime);
       oscillator.stop(ctx.currentTime + 0.04);
     } catch (e) {
@@ -393,16 +469,12 @@ export default function AACCommunicationTool() {
   const generateSuggestions = (categoryId, tileId) => {
     const key = `${categoryId}::${tileId}`;
     const patterns = PREDICTION_PATTERNS[key] || [];
-    
     const suggestedTiles = patterns.map(pattern => {
       const [catId, tId] = pattern.split('::');
       const tile = tiles[catId]?.find(t => t.id === tId);
-      if (tile) {
-        return { categoryId: catId, tile };
-      }
+      if (tile) return { categoryId: catId, tile };
       return null;
     }).filter(Boolean).slice(0, 5);
-    
     setSuggestions(suggestedTiles);
   };
 
@@ -470,18 +542,27 @@ export default function AACCommunicationTool() {
     setLoginError('');
     
     try {
-      const cloudData = await loadFromCloud(username);
+      let cloudData = await loadFromCloud(username);
       
       if (cloudData) {
         if (cloudData.password === password) {
+          // MIGRATION: Update old accounts with new features
+          const migratedData = migrateUserData(cloudData);
+          
+          // If data was migrated, save it back to the cloud
+          if (migratedData.schemaVersion !== (cloudData.schemaVersion || 1)) {
+            console.log('Saving migrated data to cloud...');
+            await saveToCloud(username, { ...migratedData, password });
+          }
+          
           setCurrentUser(username);
           setUserPassword(password);
-          setCategories(cloudData.categories || INITIAL_CATEGORIES);
-          setTiles(cloudData.tiles || INITIAL_TILES);
-          setSettings(cloudData.settings || { soundEnabled: true, highContrast: false, theme: 'default', voice: 'default' });
-          setTileUsage(cloudData.tileUsage || {});
-          setFavoriteCategories(cloudData.favoriteCategories || []);
-          setFavoriteTiles(cloudData.favoriteTiles || {});
+          setCategories(migratedData.categories || INITIAL_CATEGORIES);
+          setTiles(migratedData.tiles || INITIAL_TILES);
+          setSettings(migratedData.settings || DEFAULT_SETTINGS);
+          setTileUsage(migratedData.tileUsage || {});
+          setFavoriteCategories(migratedData.favoriteCategories || []);
+          setFavoriteTiles(migratedData.favoriteTiles || {});
           setHistory([]);
           setCurrentSelections({});
           setSuggestions([]);
@@ -523,10 +604,11 @@ export default function AACCommunicationTool() {
           password,
           categories: INITIAL_CATEGORIES,
           tiles: INITIAL_TILES,
-          settings: { soundEnabled: true, highContrast: false, theme: 'default', voice: 'default' },
+          settings: DEFAULT_SETTINGS,
           tileUsage: {},
           favoriteCategories: [],
-          favoriteTiles: {}
+          favoriteTiles: {},
+          schemaVersion: SCHEMA_VERSION
         };
         
         await saveToCloud(username, newUserData);
@@ -551,7 +633,8 @@ export default function AACCommunicationTool() {
         settings,
         tileUsage,
         favoriteCategories,
-        favoriteTiles
+        favoriteTiles,
+        schemaVersion: SCHEMA_VERSION
       });
     }
     setCurrentUser(null);
@@ -566,63 +649,34 @@ export default function AACCommunicationTool() {
 
   const handleTileClick = (categoryId, tile) => {
     playTapSound();
-    
     const usageKey = `${categoryId}::${tile.id}`;
-    setTileUsage(prev => ({
-      ...prev,
-      [usageKey]: (prev[usageKey] || 0) + 1
-    }));
-    
-    setCurrentSelections(prev => ({
-      ...prev,
-      [categoryId]: tile
-    }));
-    
+    setTileUsage(prev => ({ ...prev, [usageKey]: (prev[usageKey] || 0) + 1 }));
+    setCurrentSelections(prev => ({ ...prev, [categoryId]: tile }));
     setLastSelectedTile({ categoryId, tile });
     generateSuggestions(categoryId, tile.id);
-    
     setCurrentPage('main');
   };
 
   const handleSuggestionClick = (categoryId, tile) => {
     playTapSound();
-    
     const usageKey = `${categoryId}::${tile.id}`;
-    setTileUsage(prev => ({
-      ...prev,
-      [usageKey]: (prev[usageKey] || 0) + 1
-    }));
-    
-    setCurrentSelections(prev => ({
-      ...prev,
-      [categoryId]: tile
-    }));
-    
+    setTileUsage(prev => ({ ...prev, [usageKey]: (prev[usageKey] || 0) + 1 }));
+    setCurrentSelections(prev => ({ ...prev, [categoryId]: tile }));
     setLastSelectedTile({ categoryId, tile });
     generateSuggestions(categoryId, tile.id);
   };
 
   const handleMostUsedTileClick = (categoryId, tile) => {
     playTapSound();
-    
     const usageKey = `${categoryId}::${tile.id}`;
-    setTileUsage(prev => ({
-      ...prev,
-      [usageKey]: (prev[usageKey] || 0) + 1
-    }));
-    
-    setCurrentSelections(prev => ({
-      ...prev,
-      [categoryId]: tile
-    }));
-    
+    setTileUsage(prev => ({ ...prev, [usageKey]: (prev[usageKey] || 0) + 1 }));
+    setCurrentSelections(prev => ({ ...prev, [categoryId]: tile }));
     setLastSelectedTile({ categoryId, tile });
     generateSuggestions(categoryId, tile.id);
   };
 
   const buildSentencePreview = () => {
     const parts = [];
-    
     Object.entries(currentSelections).forEach(([categoryId, tile]) => {
       if (tile) {
         parts.push({
@@ -634,7 +688,6 @@ export default function AACCommunicationTool() {
         });
       }
     });
-    
     return parts;
   };
 
@@ -675,11 +728,9 @@ export default function AACCommunicationTool() {
       }
     }
     
-    // Ensure exactly one period at the end
     if (sentence) {
       sentence = sentence.replace(/\.+$/, '') + '.';
     }
-    
     return sentence;
   };
 
@@ -701,41 +752,26 @@ export default function AACCommunicationTool() {
     if (e.preventDefault) e.preventDefault();
     const x = e.clientX || e.pageX;
     const y = e.clientY || e.pageY;
-    setContextMenu({
-      x,
-      y,
-      type,
-      item,
-      categoryId
-    });
+    setContextMenu({ x, y, type, item, categoryId });
   };
 
   const closeContextMenu = () => setContextMenu(null);
 
   const handleChangeImage = () => {
-    setPopup({
-      type: 'changeImage',
-      target: contextMenu.type,
-      item: contextMenu.item,
-      categoryId: contextMenu.categoryId
-    });
+    setPopup({ type: 'changeImage', target: contextMenu.type, item: contextMenu.item, categoryId: contextMenu.categoryId });
     closeContextMenu();
   };
 
   const handleDeleteImage = () => {
     if (contextMenu.type === 'category') {
       if (!contextMenu.item.isDefault && contextMenu.item.customImage) {
-        setCategories(prev => prev.map(c => 
-          c.id === contextMenu.item.id ? { ...c, customImage: null } : c
-        ));
+        setCategories(prev => prev.map(c => c.id === contextMenu.item.id ? { ...c, customImage: null } : c));
       }
     } else if (contextMenu.type === 'tile') {
       if (!contextMenu.item.isDefault && contextMenu.item.customImage) {
         setTiles(prev => ({
           ...prev,
-          [contextMenu.categoryId]: prev[contextMenu.categoryId].map(t =>
-            t.id === contextMenu.item.id ? { ...t, customImage: null } : t
-          )
+          [contextMenu.categoryId]: prev[contextMenu.categoryId].map(t => t.id === contextMenu.item.id ? { ...t, customImage: null } : t)
         }));
       }
     }
@@ -745,22 +781,13 @@ export default function AACCommunicationTool() {
   const handleToggleFavorite = () => {
     if (contextMenu.type === 'category') {
       const catId = contextMenu.item.id;
-      setFavoriteCategories(prev => 
-        prev.includes(catId) 
-          ? prev.filter(id => id !== catId)
-          : [...prev, catId]
-      );
+      setFavoriteCategories(prev => prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]);
     } else if (contextMenu.type === 'tile') {
       const catId = contextMenu.categoryId;
       const tileId = contextMenu.item.id;
       setFavoriteTiles(prev => {
         const categoryFavs = prev[catId] || [];
-        return {
-          ...prev,
-          [catId]: categoryFavs.includes(tileId)
-            ? categoryFavs.filter(id => id !== tileId)
-            : [...categoryFavs, tileId]
-        };
+        return { ...prev, [catId]: categoryFavs.includes(tileId) ? categoryFavs.filter(id => id !== tileId) : [...categoryFavs, tileId] };
       });
     }
     closeContextMenu();
@@ -769,10 +796,7 @@ export default function AACCommunicationTool() {
   const handleDeleteCategory = () => {
     if (!contextMenu.item.isDefault) {
       requestPasswordVerification('delete category', () => {
-        setPopup({
-          type: 'confirmDeleteCategory',
-          item: contextMenu.item
-        });
+        setPopup({ type: 'confirmDeleteCategory', item: contextMenu.item });
       });
     }
     closeContextMenu();
@@ -783,10 +807,7 @@ export default function AACCommunicationTool() {
       const tileToDelete = contextMenu.item;
       const catId = contextMenu.categoryId;
       requestPasswordVerification('delete tile', () => {
-        setTiles(prev => ({
-          ...prev,
-          [catId]: prev[catId].filter(t => t.id !== tileToDelete.id)
-        }));
+        setTiles(prev => ({ ...prev, [catId]: prev[catId].filter(t => t.id !== tileToDelete.id) }));
       });
     }
     closeContextMenu();
@@ -795,11 +816,7 @@ export default function AACCommunicationTool() {
   const confirmDeleteCategory = () => {
     const catId = popup.item.id;
     setCategories(prev => prev.filter(c => c.id !== catId));
-    setTiles(prev => {
-      const newTiles = { ...prev };
-      delete newTiles[catId];
-      return newTiles;
-    });
+    setTiles(prev => { const newTiles = { ...prev }; delete newTiles[catId]; return newTiles; });
     setFavoriteCategories(prev => prev.filter(id => id !== catId));
     setPopup(null);
   };
@@ -809,47 +826,26 @@ export default function AACCommunicationTool() {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        if (target === 'newCategory') {
-          setNewCategoryForm(prev => ({ ...prev, image: event.target.result }));
-        } else if (target === 'newTile') {
-          setNewTileForm(prev => ({ ...prev, image: event.target.result }));
-        } else if (target === 'edit') {
-          setEditForm(prev => ({ ...prev, image: event.target.result }));
-        }
+        if (target === 'newCategory') setNewCategoryForm(prev => ({ ...prev, image: event.target.result }));
+        else if (target === 'newTile') setNewTileForm(prev => ({ ...prev, image: event.target.result }));
+        else if (target === 'edit') setEditForm(prev => ({ ...prev, image: event.target.result }));
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleCreateCategoryClick = () => {
-    requestPasswordVerification('create category', () => {
-      setPopup({ type: 'createCategory' });
-    });
+    requestPasswordVerification('create category', () => { setPopup({ type: 'createCategory' }); });
   };
 
   const handleCreateTileClick = () => {
-    requestPasswordVerification('create tile', () => {
-      setPopup({ type: 'createTile' });
-    });
+    requestPasswordVerification('create tile', () => { setPopup({ type: 'createTile' }); });
   };
 
   const createCategory = () => {
-    if (!newCategoryForm.name || !newCategoryForm.stem) {
-      setCategoryError('Please fill in all fields');
-      return;
-    }
-    if (!newCategoryForm.image) {
-      setCategoryError('Please upload an image');
-      return;
-    }
-    const newCat = {
-      id: `custom_${Date.now()}`,
-      name: newCategoryForm.name,
-      emoji: '📁',
-      customImage: newCategoryForm.image,
-      isDefault: false,
-      stem: newCategoryForm.stem
-    };
+    if (!newCategoryForm.name || !newCategoryForm.stem) { setCategoryError('Please fill in all fields'); return; }
+    if (!newCategoryForm.image) { setCategoryError('Please upload an image'); return; }
+    const newCat = { id: `custom_${Date.now()}`, name: newCategoryForm.name, emoji: '📁', customImage: newCategoryForm.image, isDefault: false, stem: newCategoryForm.stem };
     setCategories(prev => [...prev, newCat]);
     setTiles(prev => ({ ...prev, [newCat.id]: [] }));
     setNewCategoryForm({ name: '', image: null, stem: '' });
@@ -858,233 +854,164 @@ export default function AACCommunicationTool() {
   };
 
   const createTile = () => {
-    if (!newTileForm.name) {
-      setTileError('Please enter a tile name');
-      return;
-    }
-    if (!newTileForm.image) {
-      setTileError('Please upload an image');
-      return;
-    }
-    if (!selectedCategory) {
-      setTileError('No category selected');
-      return;
-    }
-    const newTile = {
-      id: `custom_${Date.now()}`,
-      name: newTileForm.name,
-      emoji: '📝',
-      customImage: newTileForm.image,
-      isDefault: false
-    };
-    setTiles(prev => ({
-      ...prev,
-      [selectedCategory]: [...(prev[selectedCategory] || []), newTile]
-    }));
+    if (!newTileForm.name) { setTileError('Please enter a tile name'); return; }
+    if (!newTileForm.image) { setTileError('Please upload an image'); return; }
+    if (!selectedCategory) { setTileError('No category selected'); return; }
+    const newTile = { id: `custom_${Date.now()}`, name: newTileForm.name, emoji: '📝', customImage: newTileForm.image, isDefault: false };
+    setTiles(prev => ({ ...prev, [selectedCategory]: [...(prev[selectedCategory] || []), newTile] }));
     setNewTileForm({ name: '', image: null });
     setTileError('');
     setPopup(null);
   };
 
-const BACKEND_URL =
-  import.meta?.env?.VITE_BACKEND_URL || "https://aac-backend.vercel.app";
+  // Backend URL for AI tile generation
+  const BACKEND_URL = import.meta?.env?.VITE_BACKEND_URL || "https://aac-backend.vercel.app";
 
-const handleGenerateMoreTiles = async () => {
-  if (!selectedCategory || isGeneratingTiles) return;
+  const handleGenerateMoreTiles = async () => {
+    if (!selectedCategory || isGeneratingTiles) return;
 
-  setIsGeneratingTiles(true);
+    setIsGeneratingTiles(true);
+    setGenerationError('');
 
-  const category = categories.find((c) => c.id === selectedCategory);
-  const existingTiles = tiles[selectedCategory] || [];
-  const existingNames = existingTiles.map((t) => t.name).join(", ");
+    const category = categories.find((c) => c.id === selectedCategory);
+    const existingTiles = tiles[selectedCategory] || [];
+    const existingNames = existingTiles.map((t) => t.name).join(", ");
 
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/generate-tiles`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        categoryName: category?.name || "",
-        stem: category?.stem || "",
-        existingTiles: existingNames || "none",
-      }),
-    });
-
-    // Helpful error logging if backend fails
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("generate-tiles failed:", response.status, errText);
-      return;
-    }
-
-    // Try to parse JSON response, but be resilient
-    const contentType = response.headers.get("content-type") || "";
-    let payload;
-
-    if (contentType.includes("application/json")) {
-      payload = await response.json();
-    } else {
-      payload = await response.text();
-    }
-
-    // Normalize to an array of suggestions: [{name, emoji?}, ...]
-    let suggestionsArray = null;
-
-    // Case A: backend returns an array directly
-    if (Array.isArray(payload)) {
-      suggestionsArray = payload;
-    }
-
-    // Case B: backend returns { tiles: [...] }
-    if (!suggestionsArray && payload && Array.isArray(payload.tiles)) {
-      suggestionsArray = payload.tiles;
-    }
-
-    // Case C: backend returns { suggestions: [...] }
-    if (!suggestionsArray && payload && Array.isArray(payload.suggestions)) {
-      suggestionsArray = payload.suggestions;
-    }
-
-    // Case D: backend returns { text: "```json [...] ```" } OR { text: "[...]" }
-    if (!suggestionsArray && payload && typeof payload === "object" && typeof payload.text === "string") {
-      const cleaned = payload.text.replace(/```json|```/g, "").trim();
-      try {
-        const parsed = JSON.parse(cleaned);
-        if (Array.isArray(parsed)) suggestionsArray = parsed;
-      } catch (e) {
-        console.error("Could not JSON.parse(payload.text):", cleaned);
-      }
-    }
-
-    // Case E: backend returns plain text "```json [...]```" or "[...]"
-    if (!suggestionsArray && typeof payload === "string") {
-      const cleaned = payload.replace(/```json|```/g, "").trim();
-      try {
-        const parsed = JSON.parse(cleaned);
-        if (Array.isArray(parsed)) suggestionsArray = parsed;
-      } catch (e) {
-        console.error("Could not JSON.parse(text payload):", cleaned);
-      }
-    }
-
-    if (!Array.isArray(suggestionsArray)) {
-      console.error("No valid suggestions array returned from backend:", payload);
-      return;
-    }
-
-    const newTiles = suggestionsArray
-      .filter((s) => s && typeof s.name === "string" && s.name.trim().length > 0)
-      .map((suggestion, index) => {
-        const tile = {
-          id: `ai_${Date.now()}_${index}`,
-          name: suggestion.name.trim(),
-          emoji: suggestion.emoji || "📝",
-          isDefault: false,
-          isAIGenerated: true,
-        };
-
-        if (selectedCategory === "phrases") {
-          // Ensure a period at the end
-          const base = tile.name.replace(/\.+$/, "");
-          tile.fullPhrase = base + ".";
-        }
-
-        return tile;
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/generate-tiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryName: category?.name || "",
+          stem: category?.stem || "",
+          existingTiles: existingNames || "none",
+        }),
       });
 
-    if (newTiles.length > 0) {
-      setTiles((prev) => ({
-        ...prev,
-        [selectedCategory]: [...(prev[selectedCategory] || []), ...newTiles],
-      }));
-    }
-  } catch (error) {
-    console.error("Error generating tiles:", error);
-  } finally {
-    setIsGeneratingTiles(false);
-  }
-};
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("generate-tiles failed:", response.status, errText);
+        setGenerationError(`Failed to generate tiles (${response.status})`);
+        return;
+      }
 
+      const payload = await response.json();
+      
+      // Handle various response formats
+      let suggestionsArray = null;
+
+      // Direct array
+      if (Array.isArray(payload)) {
+        suggestionsArray = payload;
+      }
+      // { tiles: [...] } format (our improved backend)
+      else if (payload && Array.isArray(payload.tiles)) {
+        suggestionsArray = payload.tiles;
+      }
+      // { suggestions: [...] } format
+      else if (payload && Array.isArray(payload.suggestions)) {
+        suggestionsArray = payload.suggestions;
+      }
+      // { text: "..." } format (raw Gemini response)
+      else if (payload && typeof payload.text === "string") {
+        const cleaned = payload.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+        try {
+          const parsed = JSON.parse(cleaned);
+          if (Array.isArray(parsed)) suggestionsArray = parsed;
+        } catch (e) {
+          console.error("Could not parse payload.text:", cleaned);
+        }
+      }
+
+      if (!Array.isArray(suggestionsArray) || suggestionsArray.length === 0) {
+        console.error("No valid suggestions:", payload);
+        setGenerationError('No suggestions generated. Please try again.');
+        return;
+      }
+
+      const newTiles = suggestionsArray
+        .filter((s) => s && typeof s.name === "string" && s.name.trim().length > 0)
+        .map((suggestion, index) => {
+          const tile = {
+            id: `ai_${Date.now()}_${index}`,
+            name: suggestion.name.trim(),
+            emoji: suggestion.emoji || "📝",
+            isDefault: false,
+            isAIGenerated: true,
+          };
+          if (selectedCategory === "phrases") {
+            tile.fullPhrase = tile.name.replace(/\.+$/, "") + ".";
+          }
+          return tile;
+        });
+
+      if (newTiles.length > 0) {
+        setTiles((prev) => ({
+          ...prev,
+          [selectedCategory]: [...(prev[selectedCategory] || []), ...newTiles],
+        }));
+      } else {
+        setGenerationError('Could not create tiles from the response.');
+      }
+    } catch (error) {
+      console.error("Error generating tiles:", error);
+      setGenerationError('Network error. Please check your connection.');
+    } finally {
+      setIsGeneratingTiles(false);
+    }
+  };
 
   const handleDeleteGeneratedTiles = () => {
     if (!selectedCategory) return;
-    
     const categoryFavs = favoriteTiles[selectedCategory] || [];
-    
     requestPasswordVerification('delete generated tiles', () => {
       setTiles(prev => ({
         ...prev,
-        [selectedCategory]: (prev[selectedCategory] || []).filter(tile => 
-          !tile.isAIGenerated || categoryFavs.includes(tile.id)
-        )
+        [selectedCategory]: (prev[selectedCategory] || []).filter(tile => !tile.isAIGenerated || categoryFavs.includes(tile.id))
       }));
     });
   };
 
   const applyImageChange = () => {
     if (popup.target === 'category') {
-      setCategories(prev => prev.map(c =>
-        c.id === popup.item.id ? { ...c, customImage: editForm.image } : c
-      ));
+      setCategories(prev => prev.map(c => c.id === popup.item.id ? { ...c, customImage: editForm.image } : c));
     } else if (popup.target === 'tile') {
-      setTiles(prev => ({
-        ...prev,
-        [popup.categoryId]: prev[popup.categoryId].map(t =>
-          t.id === popup.item.id ? { ...t, customImage: editForm.image } : t
-        )
-      }));
+      setTiles(prev => ({ ...prev, [popup.categoryId]: prev[popup.categoryId].map(t => t.id === popup.item.id ? { ...t, customImage: editForm.image } : t) }));
     }
     setEditForm({ value: '', image: null });
     setPopup(null);
   };
 
   const handleChangeName = () => {
-    setPopup({
-      type: 'changeName',
-      target: contextMenu.type,
-      item: contextMenu.item,
-      categoryId: contextMenu.categoryId
-    });
+    setPopup({ type: 'changeName', target: contextMenu.type, item: contextMenu.item, categoryId: contextMenu.categoryId });
     setEditForm({ value: contextMenu.item.name, image: null });
     closeContextMenu();
   };
 
   const handleChangeStem = () => {
-    setPopup({
-      type: 'changeStem',
-      item: contextMenu.item
-    });
+    setPopup({ type: 'changeStem', item: contextMenu.item });
     setEditForm({ value: contextMenu.item.stem, image: null });
     closeContextMenu();
   };
 
   const applyNameChange = () => {
     if (popup.target === 'category') {
-      setCategories(prev => prev.map(c =>
-        c.id === popup.item.id ? { ...c, name: editForm.value } : c
-      ));
+      setCategories(prev => prev.map(c => c.id === popup.item.id ? { ...c, name: editForm.value } : c));
     } else if (popup.target === 'tile') {
-      setTiles(prev => ({
-        ...prev,
-        [popup.categoryId]: prev[popup.categoryId].map(t =>
-          t.id === popup.item.id ? { ...t, name: editForm.value } : t
-        )
-      }));
+      setTiles(prev => ({ ...prev, [popup.categoryId]: prev[popup.categoryId].map(t => t.id === popup.item.id ? { ...t, name: editForm.value } : t) }));
     }
     setEditForm({ value: '', image: null });
     setPopup(null);
   };
 
   const applyStemChange = () => {
-    setCategories(prev => prev.map(c =>
-      c.id === popup.item.id ? { ...c, stem: editForm.value } : c
-    ));
+    setCategories(prev => prev.map(c => c.id === popup.item.id ? { ...c, stem: editForm.value } : c));
     setEditForm({ value: '', image: null });
     setPopup(null);
   };
 
   const renderTileImage = (item, size = 'normal') => {
     const sizeClass = size === 'small' ? 'w-10 h-10' : 'w-40 h-40';
-    
     if (item.customImage) {
       return <img src={item.customImage} alt={item.name} className={`${sizeClass} object-cover rounded-lg`} />;
     }
@@ -1104,121 +1031,45 @@ const handleGenerateMoreTiles = async () => {
     }
   };
 
-  const textStyle = settings.highContrast ? 'text-white' : (settings.theme !== 'default' && settings.theme !== 'ocean' && settings.theme !== 'dinosaurs' && settings.theme !== 'princess' ? 'text-white' : (settings.theme === 'space' ? 'text-white' : 'text-gray-800'));
+  const textStyle = settings.highContrast ? 'text-white' : (settings.theme === 'space' ? 'text-white' : 'text-gray-800');
   const cardStyle = settings.highContrast ? 'bg-gray-900 border-2 border-white' : (settings.theme === 'space' ? 'bg-indigo-800/80' : settings.theme === 'ocean' ? 'bg-cyan-100/90' : settings.theme === 'dinosaurs' ? 'bg-lime-100/90' : settings.theme === 'princess' ? 'bg-pink-100/90' : 'bg-white');
 
-  // Login Page
+  // LOGIN PAGE
   if (currentPage === 'login') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 flex flex-col items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">LOG-IN</h1>
-          
-          <input
-            type="text"
-            placeholder="Username"
-            value={loginForm.username}
-            onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
-            className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none"
-            disabled={isLoading}
-          />
-          
-          <input
-            type="password"
-            placeholder="Password"
-            value={loginForm.password}
-            onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none"
-            disabled={isLoading}
-          />
-          
-          <button
-            onClick={handleLogin}
-            disabled={isLoading}
-            className="w-full bg-blue-500 text-white p-4 rounded-xl text-xl font-semibold hover:bg-blue-600 transition mb-4 disabled:bg-gray-400"
-          >
-            {isLoading ? 'Connecting...' : 'Login'}
-          </button>
-          
-          <button
-            onClick={() => setCurrentPage('register')}
-            disabled={isLoading}
-            className="w-full bg-gray-100 text-gray-700 p-4 rounded-xl text-lg hover:bg-gray-200 transition disabled:bg-gray-50"
-          >
-            Create New Account
-          </button>
-          
-          {loginError && (
-            <p className="text-red-500 text-center mt-4 font-medium">{loginError}</p>
-          )}
+          <input type="text" placeholder="Username" value={loginForm.username} onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))} className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none" disabled={isLoading} />
+          <input type="password" placeholder="Password" value={loginForm.password} onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none" disabled={isLoading} />
+          <button onClick={handleLogin} disabled={isLoading} className="w-full bg-blue-500 text-white p-4 rounded-xl text-xl font-semibold hover:bg-blue-600 transition mb-4 disabled:bg-gray-400">{isLoading ? 'Connecting...' : 'Login'}</button>
+          <button onClick={() => setCurrentPage('register')} disabled={isLoading} className="w-full bg-gray-100 text-gray-700 p-4 rounded-xl text-lg hover:bg-gray-200 transition disabled:bg-gray-50">Create New Account</button>
+          {loginError && <p className="text-red-500 text-center mt-4 font-medium">{loginError}</p>}
         </div>
       </div>
     );
   }
 
-  // Register Page
+  // REGISTER PAGE
   if (currentPage === 'register') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 flex flex-col items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Create Account</h1>
-          
-          <input
-            type="text"
-            placeholder="Create username"
-            value={registerForm.username}
-            onChange={(e) => setRegisterForm(prev => ({ ...prev, username: e.target.value }))}
-            className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none"
-            disabled={isLoading}
-          />
-          
-          <input
-            type="password"
-            placeholder="Create password"
-            value={registerForm.password}
-            onChange={(e) => setRegisterForm(prev => ({ ...prev, password: e.target.value }))}
-            className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none"
-            disabled={isLoading}
-          />
-          
-          <input
-            type="password"
-            placeholder="Confirm password"
-            value={registerForm.confirmPassword}
-            onChange={(e) => setRegisterForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-            className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none"
-            disabled={isLoading}
-          />
-          
-          <button
-            onClick={handleRegister}
-            disabled={isLoading}
-            className="w-full bg-green-500 text-white p-4 rounded-xl text-xl font-semibold hover:bg-green-600 transition mb-4 disabled:bg-gray-400"
-          >
-            {isLoading ? 'Creating...' : 'Confirm Registration'}
-          </button>
-          
-          <button
-            onClick={() => setCurrentPage('login')}
-            disabled={isLoading}
-            className="w-full bg-gray-100 text-gray-700 p-4 rounded-xl text-lg hover:bg-gray-200 transition disabled:bg-gray-50"
-          >
-            Back to Login
-          </button>
-          
-          {registerError && (
-            <p className="text-red-500 text-center mt-4 font-medium">{registerError}</p>
-          )}
+          <input type="text" placeholder="Create username" value={registerForm.username} onChange={(e) => setRegisterForm(prev => ({ ...prev, username: e.target.value }))} className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none" disabled={isLoading} />
+          <input type="password" placeholder="Create password" value={registerForm.password} onChange={(e) => setRegisterForm(prev => ({ ...prev, password: e.target.value }))} className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none" disabled={isLoading} />
+          <input type="password" placeholder="Confirm password" value={registerForm.confirmPassword} onChange={(e) => setRegisterForm(prev => ({ ...prev, confirmPassword: e.target.value }))} className="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-lg focus:border-blue-400 focus:outline-none" disabled={isLoading} />
+          <button onClick={handleRegister} disabled={isLoading} className="w-full bg-green-500 text-white p-4 rounded-xl text-xl font-semibold hover:bg-green-600 transition mb-4 disabled:bg-gray-400">{isLoading ? 'Creating...' : 'Confirm Registration'}</button>
+          <button onClick={() => setCurrentPage('login')} disabled={isLoading} className="w-full bg-gray-100 text-gray-700 p-4 rounded-xl text-lg hover:bg-gray-200 transition disabled:bg-gray-50">Back to Login</button>
+          {registerError && <p className="text-red-500 text-center mt-4 font-medium">{registerError}</p>}
         </div>
       </div>
     );
   }
 
-  // Main Page & Category Pages
+  // MAIN PAGE & CATEGORY PAGES
   return (
     <div className="min-h-screen relative flex" onClick={closeContextMenu}>
-      {/* Theme Background */}
       {!settings.highContrast && renderThemeBackground()}
       {settings.highContrast && <div className="fixed inset-0 bg-black" />}
       {settings.theme === 'default' && !settings.highContrast && <div className="fixed inset-0 bg-gray-50" />}
@@ -1228,134 +1079,63 @@ const handleGenerateMoreTiles = async () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <h1 className={`text-2xl font-bold ${settings.theme === 'space' ? 'text-white' : textStyle}`}>AAC Communication Tool</h1>
+            <h1 className={`text-2xl font-bold ${textStyle}`}>AAC Communication Tool</h1>
             {syncStatus && <span className="text-green-500 text-sm">{syncStatus}</span>}
           </div>
           <div className="flex gap-2">
-            {currentPage === 'category' && (
-              <button
-                onClick={handleCreateTileClick}
-                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm font-medium"
-              >
-                Create Tile
-              </button>
-            )}
+            {currentPage === 'category' && <button onClick={handleCreateTileClick} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm font-medium">Create Tile</button>}
             {currentPage === 'main' && (
               <>
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition text-sm font-medium"
-                >
-                  ⚙️ Settings
-                </button>
-                <button
-                  onClick={handleCreateCategoryClick}
-                  className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm font-medium"
-                >
-                  Create Category
-                </button>
+                <button onClick={() => setShowSettings(!showSettings)} className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition text-sm font-medium">⚙️ Settings</button>
+                <button onClick={handleCreateCategoryClick} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm font-medium">Create Category</button>
               </>
             )}
-            <button
-              onClick={handleLogout}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition text-sm font-medium"
-            >
-              Log Out
-            </button>
+            <button onClick={handleLogout} className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition text-sm font-medium">Log Out</button>
           </div>
         </div>
 
         {/* Sentence Preview */}
         {currentPage === 'main' && buildSentencePreview().length > 0 && (
           <div className={`${cardStyle} rounded-xl p-4 mb-4 shadow-lg`}>
-            <p className={`text-sm opacity-70 mb-2 ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>Building sentence:</p>
+            <p className={`text-sm opacity-70 mb-2 ${textStyle}`}>Building sentence:</p>
             <div className="flex items-center gap-3 flex-wrap">
               {buildSentencePreview().map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2 bg-blue-100 rounded-lg px-3 py-2">
-                  {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
-                  ) : (
-                    <span className="text-2xl">{item.emoji}</span>
-                  )}
+                  {item.image ? <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" /> : <span className="text-2xl">{item.emoji}</span>}
                   <span className="font-medium text-gray-800">{item.name}</span>
                 </div>
               ))}
             </div>
-            <p className={`mt-2 text-lg font-medium ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>"{buildSentence()}"</p>
+            <p className={`mt-2 text-lg font-medium ${textStyle}`}>"{buildSentence()}"</p>
           </div>
         )}
 
         {/* Settings Panel */}
         {showSettings && currentPage === 'main' && (
           <div className={`${cardStyle} rounded-xl p-4 mb-4 shadow-lg`}>
-            <h3 className={`font-bold mb-3 ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>Settings</h3>
+            <h3 className={`font-bold mb-3 ${textStyle}`}>Settings</h3>
             <div className="flex flex-col gap-4">
-              <label className={`flex items-center gap-3 cursor-pointer ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>
-                <input
-                  type="checkbox"
-                  checked={settings.soundEnabled}
-                  onChange={(e) => setSettings(prev => ({ ...prev, soundEnabled: e.target.checked }))}
-                  className="w-5 h-5"
-                />
+              <label className={`flex items-center gap-3 cursor-pointer ${textStyle}`}>
+                <input type="checkbox" checked={settings.soundEnabled} onChange={(e) => setSettings(prev => ({ ...prev, soundEnabled: e.target.checked }))} className="w-5 h-5" />
                 <span>🔊 Sound on tap</span>
               </label>
-              
-              <label className={`flex items-center gap-3 cursor-pointer ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>
-                <input
-                  type="checkbox"
-                  checked={settings.highContrast}
-                  onChange={(e) => setSettings(prev => ({ ...prev, highContrast: e.target.checked }))}
-                  className="w-5 h-5"
-                />
+              <label className={`flex items-center gap-3 cursor-pointer ${textStyle}`}>
+                <input type="checkbox" checked={settings.highContrast} onChange={(e) => setSettings(prev => ({ ...prev, highContrast: e.target.checked }))} className="w-5 h-5" />
                 <span>🌓 High contrast mode</span>
               </label>
-              
               <div>
-                <p className={`mb-2 font-medium ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>🎨 Theme</p>
+                <p className={`mb-2 font-medium ${textStyle}`}>🎨 Theme</p>
                 <div className="flex gap-2 flex-wrap">
-                  {[
-                    { id: 'default', name: 'Default' },
-                    { id: 'space', name: 'Space' },
-                    { id: 'ocean', name: 'Ocean' },
-                    { id: 'dinosaurs', name: 'Dinosaurs' },
-                    { id: 'princess', name: 'Princess' }
-                  ].map(themeOption => (
-                    <button
-                      key={themeOption.id}
-                      onClick={() => setSettings(prev => ({ ...prev, theme: themeOption.id }))}
-                      className={`px-4 py-2 rounded-lg transition ${
-                        settings.theme === themeOption.id 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {themeOption.name}
-                    </button>
+                  {[{ id: 'default', name: 'Default' }, { id: 'space', name: 'Space' }, { id: 'ocean', name: 'Ocean' }, { id: 'dinosaurs', name: 'Dinosaurs' }, { id: 'princess', name: 'Princess' }].map(themeOption => (
+                    <button key={themeOption.id} onClick={() => setSettings(prev => ({ ...prev, theme: themeOption.id }))} className={`px-4 py-2 rounded-lg transition ${settings.theme === themeOption.id ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>{themeOption.name}</button>
                   ))}
                 </div>
               </div>
-              
               <div>
-                <p className={`mb-2 font-medium ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>🗣️ Voice</p>
+                <p className={`mb-2 font-medium ${textStyle}`}>🗣️ Voice</p>
                 <div className="flex gap-2 flex-wrap">
                   {VOICE_OPTIONS.map(voice => (
-                    <button
-                      key={voice.id}
-                      onClick={() => {
-                        setSettings(prev => ({ ...prev, voice: voice.id }));
-                        const utterance = new SpeechSynthesisUtterance("Hello!");
-                        utterance.rate = voice.rate;
-                        utterance.pitch = voice.pitch;
-                        window.speechSynthesis.speak(utterance);
-                      }}
-                      className={`px-4 py-2 rounded-lg transition ${
-                        settings.voice === voice.id 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {voice.name}
-                    </button>
+                    <button key={voice.id} onClick={() => { setSettings(prev => ({ ...prev, voice: voice.id })); const utterance = new SpeechSynthesisUtterance("Hello!"); utterance.rate = voice.rate; utterance.pitch = voice.pitch; window.speechSynthesis.speak(utterance); }} className={`px-4 py-2 rounded-lg transition ${settings.voice === voice.id ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>{voice.name}</button>
                   ))}
                 </div>
               </div>
@@ -1366,15 +1146,8 @@ const handleGenerateMoreTiles = async () => {
         {/* Category Name (when in category view) */}
         {currentPage === 'category' && selectedCategory && (
           <div className="mb-4">
-            <button
-              onClick={() => setCurrentPage('main')}
-              className="text-blue-400 hover:text-blue-300 mb-2 flex items-center gap-1"
-            >
-              ← Back
-            </button>
-            <h2 className={`text-xl font-semibold capitalize ${settings.theme === 'space' ? 'text-white' : textStyle}`}>
-              {categories.find(c => c.id === selectedCategory)?.name}
-            </h2>
+            <button onClick={() => setCurrentPage('main')} className="text-blue-400 hover:text-blue-300 mb-2 flex items-center gap-1">← Back</button>
+            <h2 className={`text-xl font-semibold capitalize ${textStyle}`}>{categories.find(c => c.id === selectedCategory)?.name}</h2>
           </div>
         )}
 
@@ -1382,47 +1155,14 @@ const handleGenerateMoreTiles = async () => {
         <div className="flex-1 overflow-auto">
           {currentPage === 'main' ? (
             <>
-              {/* Categories Grid - 3 columns */}
+              {/* Categories Grid */}
               <div className="grid grid-cols-3 gap-4 mb-8">
                 {getSortedCategories().map(category => (
-                  <button
-                    key={category.id}
-                    onClick={() => {
-                      playTapSound();
-                      setSelectedCategory(category.id);
-                      setCurrentPage('category');
-                    }}
-                    onContextMenu={(e) => handleContextMenu(e, 'category', category)}
-                    onTouchStart={(e) => {
-                      const timer = setTimeout(() => {
-                        handleContextMenu(e.touches[0], 'category', category);
-                      }, 500);
-                      e.target.longPressTimer = timer;
-                    }}
-                    onTouchEnd={(e) => {
-                      if (e.target.longPressTimer) {
-                        clearTimeout(e.target.longPressTimer);
-                      }
-                    }}
-                    onTouchMove={(e) => {
-                      if (e.target.longPressTimer) {
-                        clearTimeout(e.target.longPressTimer);
-                      }
-                    }}
-                    className={`${getCategoryColor(category)} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 aspect-square relative`}
-                  >
-                    {isCategoryFavorite(category.id) && (
-                      <span className="absolute top-2 right-2 text-xl">⭐</span>
-                    )}
-                    <div className="flex items-center justify-center flex-1">
-                      {renderTileImage(category)}
-                    </div>
+                  <button key={category.id} onClick={() => { playTapSound(); setSelectedCategory(category.id); setCurrentPage('category'); }} onContextMenu={(e) => handleContextMenu(e, 'category', category)} onTouchStart={(e) => { const timer = setTimeout(() => handleContextMenu(e.touches[0], 'category', category), 500); e.target.longPressTimer = timer; }} onTouchEnd={(e) => { if (e.target.longPressTimer) clearTimeout(e.target.longPressTimer); }} onTouchMove={(e) => { if (e.target.longPressTimer) clearTimeout(e.target.longPressTimer); }} className={`${getCategoryColor(category)} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 aspect-square relative`}>
+                    {isCategoryFavorite(category.id) && <span className="absolute top-2 right-2 text-xl">⭐</span>}
+                    <div className="flex items-center justify-center flex-1">{renderTileImage(category)}</div>
                     <span className={`text-lg font-bold mt-2 ${settings.highContrast ? 'text-white' : 'text-gray-800'}`}>{category.name}</span>
-                    {currentSelections[category.id] && (
-                      <span className="text-xs text-green-600 font-medium">
-                        ✓ {currentSelections[category.id].name}
-                      </span>
-                    )}
+                    {currentSelections[category.id] && <span className="text-xs text-green-600 font-medium">✓ {currentSelections[category.id].name}</span>}
                   </button>
                 ))}
               </div>
@@ -1430,20 +1170,12 @@ const handleGenerateMoreTiles = async () => {
               {/* Suggestions Section */}
               {suggestions.length > 0 && (
                 <div className="mb-6">
-                  <h3 className={`text-lg font-semibold mb-3 ${settings.theme === 'space' ? 'text-white' : textStyle}`}>Suggestions</h3>
+                  <h3 className={`text-lg font-semibold mb-3 ${textStyle}`}>Suggestions</h3>
                   <div className="grid grid-cols-5 gap-3">
                     {suggestions.map(({ categoryId, tile }) => (
-                      <button
-                        key={`suggestion-${categoryId}-${tile.id}`}
-                        onClick={() => handleSuggestionClick(categoryId, tile)}
-                        className={`${cardStyle} rounded-xl shadow p-3 flex flex-col items-center justify-center hover:shadow-lg transition border-2 ${
-                          currentSelections[categoryId]?.id === tile.id 
-                            ? 'border-green-400 bg-green-50' 
-                            : 'border-gray-200'
-                        }`}
-                      >
+                      <button key={`suggestion-${categoryId}-${tile.id}`} onClick={() => handleSuggestionClick(categoryId, tile)} className={`${cardStyle} rounded-xl shadow p-3 flex flex-col items-center justify-center hover:shadow-lg transition border-2 ${currentSelections[categoryId]?.id === tile.id ? 'border-green-400 bg-green-50' : 'border-gray-200'}`}>
                         <span className="text-3xl">{tile.customImage ? <img src={tile.customImage} alt={tile.name} className="w-10 h-10 object-cover rounded" /> : tile.emoji}</span>
-                        <span className={`mt-1 text-xs font-medium text-center ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{tile.name}</span>
+                        <span className={`mt-1 text-xs font-medium text-center ${textStyle}`}>{tile.name}</span>
                       </button>
                     ))}
                   </div>
@@ -1453,20 +1185,12 @@ const handleGenerateMoreTiles = async () => {
               {/* Most Used Tiles */}
               {getMostUsedTiles().length > 0 && (
                 <div className="mb-6">
-                  <h3 className={`text-lg font-semibold mb-3 ${settings.theme === 'space' ? 'text-white' : textStyle}`}>Most Used</h3>
+                  <h3 className={`text-lg font-semibold mb-3 ${textStyle}`}>Most Used</h3>
                   <div className="grid grid-cols-5 gap-3">
                     {getMostUsedTiles().map(({ categoryId, tile }) => (
-                      <button
-                        key={`mostused-${categoryId}-${tile.id}`}
-                        onClick={() => handleMostUsedTileClick(categoryId, tile)}
-                        className={`${cardStyle} rounded-xl shadow p-3 flex flex-col items-center justify-center hover:shadow-lg transition border-2 ${
-                          currentSelections[categoryId]?.id === tile.id 
-                            ? 'border-green-400 bg-green-50' 
-                            : 'border-gray-200'
-                        }`}
-                      >
+                      <button key={`mostused-${categoryId}-${tile.id}`} onClick={() => handleMostUsedTileClick(categoryId, tile)} className={`${cardStyle} rounded-xl shadow p-3 flex flex-col items-center justify-center hover:shadow-lg transition border-2 ${currentSelections[categoryId]?.id === tile.id ? 'border-green-400 bg-green-50' : 'border-gray-200'}`}>
                         <span className="text-3xl">{tile.customImage ? <img src={tile.customImage} alt={tile.name} className="w-10 h-10 object-cover rounded" /> : tile.emoji}</span>
-                        <span className={`mt-1 text-xs font-medium text-center ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{tile.name}</span>
+                        <span className={`mt-1 text-xs font-medium text-center ${textStyle}`}>{tile.name}</span>
                       </button>
                     ))}
                   </div>
@@ -1474,78 +1198,26 @@ const handleGenerateMoreTiles = async () => {
               )}
             </>
           ) : (
-            // Tiles Grid - 3 columns
+            // Tiles Grid
             <div className="flex flex-col h-full">
               <div className="grid grid-cols-3 gap-4">
                 {getSortedTiles(selectedCategory).map(tile => (
-                  <button
-                    key={tile.id}
-                    onClick={() => handleTileClick(selectedCategory, tile)}
-                    onContextMenu={(e) => handleContextMenu(e, 'tile', tile, selectedCategory)}
-                    onTouchStart={(e) => {
-                      const timer = setTimeout(() => {
-                        handleContextMenu(e.touches[0], 'tile', tile, selectedCategory);
-                      }, 500);
-                      e.target.longPressTimer = timer;
-                    }}
-                    onTouchEnd={(e) => {
-                      if (e.target.longPressTimer) {
-                        clearTimeout(e.target.longPressTimer);
-                      }
-                    }}
-                    onTouchMove={(e) => {
-                      if (e.target.longPressTimer) {
-                        clearTimeout(e.target.longPressTimer);
-                      }
-                    }}
-                    className={`${cardStyle} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 aspect-square relative ${
-                      currentSelections[selectedCategory]?.id === tile.id 
-                        ? 'border-green-400 bg-green-50' 
-                        : 'border-transparent hover:border-blue-300'
-                    }`}
-                  >
-                    {isTileFavorite(selectedCategory, tile.id) && (
-                      <span className="absolute top-2 right-2 text-xl">⭐</span>
-                    )}
-                    <div className="flex items-center justify-center flex-1">
-                      {renderTileImage(tile)}
-                    </div>
-                    <span className={`text-lg font-bold mt-2 ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{tile.name}</span>
+                  <button key={tile.id} onClick={() => handleTileClick(selectedCategory, tile)} onContextMenu={(e) => handleContextMenu(e, 'tile', tile, selectedCategory)} onTouchStart={(e) => { const timer = setTimeout(() => handleContextMenu(e.touches[0], 'tile', tile, selectedCategory), 500); e.target.longPressTimer = timer; }} onTouchEnd={(e) => { if (e.target.longPressTimer) clearTimeout(e.target.longPressTimer); }} onTouchMove={(e) => { if (e.target.longPressTimer) clearTimeout(e.target.longPressTimer); }} className={`${cardStyle} rounded-2xl shadow-lg p-3 flex flex-col items-center justify-center hover:shadow-xl transition border-4 aspect-square relative ${currentSelections[selectedCategory]?.id === tile.id ? 'border-green-400 bg-green-50' : 'border-transparent hover:border-blue-300'}`}>
+                    {isTileFavorite(selectedCategory, tile.id) && <span className="absolute top-2 right-2 text-xl">⭐</span>}
+                    <div className="flex items-center justify-center flex-1">{renderTileImage(tile)}</div>
+                    <span className={`text-lg font-bold mt-2 ${textStyle}`}>{tile.name}</span>
                   </button>
                 ))}
               </div>
               
               {/* AI Generate More Button */}
               <div className="mt-6 flex flex-col items-center gap-3">
-                <button
-                  onClick={handleGenerateMoreTiles}
-                  disabled={isGeneratingTiles}
-                  className={`py-4 px-8 rounded-xl text-xl font-bold transition shadow-lg flex items-center gap-3 ${
-                    isGeneratingTiles 
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : 'bg-purple-500 text-white hover:bg-purple-600'
-                  }`}
-                >
-                  {isGeneratingTiles ? (
-                    <>
-                      <span>⏳</span>
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <span>✨</span>
-                      More Suggestions
-                    </>
-                  )}
+                <button onClick={handleGenerateMoreTiles} disabled={isGeneratingTiles} className={`py-4 px-8 rounded-xl text-xl font-bold transition shadow-lg flex items-center gap-3 ${isGeneratingTiles ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-purple-500 text-white hover:bg-purple-600'}`}>
+                  {isGeneratingTiles ? <><span className="animate-spin">⏳</span>Generating...</> : <><span>✨</span>More Suggestions</>}
                 </button>
-                
+                {generationError && <p className="text-red-500 text-sm font-medium">{generationError}</p>}
                 {(tiles[selectedCategory] || []).some(tile => tile.isAIGenerated) && (
-                  <button
-                    onClick={handleDeleteGeneratedTiles}
-                    className="py-2 px-6 rounded-lg text-sm font-medium transition shadow bg-red-100 text-red-600 hover:bg-red-200"
-                  >
-                    🗑️ Delete Generated Tiles (does not delete favorited tiles)
-                  </button>
+                  <button onClick={handleDeleteGeneratedTiles} className="py-2 px-6 rounded-lg text-sm font-medium transition shadow bg-red-100 text-red-600 hover:bg-red-200">🗑️ Delete Generated Tiles (keeps favorites)</button>
                 )}
               </div>
             </div>
@@ -1555,35 +1227,20 @@ const handleGenerateMoreTiles = async () => {
 
       {/* Right Section - 1/3 History */}
       <div className={`w-1/3 p-6 relative z-10 flex flex-col ${cardStyle}`}>
-        {/* Done Button at top */}
         {currentPage === 'main' && (
-          <button
-            onClick={handleDone}
-            className="mb-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-6 px-8 rounded-2xl text-3xl font-bold hover:opacity-90 transition shadow-xl flex items-center justify-center gap-3"
-          >
+          <button onClick={handleDone} className="mb-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-6 px-8 rounded-2xl text-3xl font-bold hover:opacity-90 transition shadow-xl flex items-center justify-center gap-3">
             <span className="text-5xl">🏁</span> Done
           </button>
         )}
-        
         {currentSentence && (
           <div className="flex items-start gap-2 mb-4">
-            <p className={`text-xl font-medium ${settings.theme === 'space' ? 'text-white' : 'text-gray-800'}`}>{currentSentence}</p>
-            <button
-              onClick={() => speak(currentSentence)}
-              className="text-2xl hover:scale-110 transition"
-              title="Speak again"
-            >
-              🔊
-            </button>
+            <p className={`text-xl font-medium ${textStyle}`}>{currentSentence}</p>
+            <button onClick={() => speak(currentSentence)} className="text-2xl hover:scale-110 transition" title="Speak again">🔊</button>
           </div>
         )}
-        
         <div className="border-b-2 border-black mb-4"></div>
-        
         <div className="space-y-2 flex-1 overflow-auto">
-          {[...history].reverse().map((sentence, idx) => (
-            <p key={idx} className="text-gray-400 text-lg">{sentence}</p>
-          ))}
+          {[...history].reverse().map((sentence, idx) => <p key={idx} className="text-gray-400 text-lg">{sentence}</p>)}
         </div>
       </div>
 
@@ -1591,110 +1248,35 @@ const handleGenerateMoreTiles = async () => {
       {passwordPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md relative">
-            <button
-              onClick={() => {
-                setPasswordPopup(null);
-                setPasswordInput('');
-                setPasswordError('');
-              }}
-              className="absolute top-4 right-4 text-red-500 text-2xl font-bold hover:text-red-700"
-            >
-              ×
-            </button>
+            <button onClick={() => { setPasswordPopup(null); setPasswordInput(''); setPasswordError(''); }} className="absolute top-4 right-4 text-red-500 text-2xl font-bold hover:text-red-700">×</button>
             <h3 className="text-xl font-bold mb-4">🔒 Enter Password</h3>
             <p className="text-gray-600 mb-4">Enter your password to {passwordPopup.action}</p>
-            <input
-              type="password"
-              placeholder="Password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  verifyPassword(passwordPopup.callback);
-                }
-              }}
-              className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none"
-              autoFocus
-            />
-            {passwordError && (
-              <p className="text-red-500 text-sm mb-4">{passwordError}</p>
-            )}
-            <button
-              onClick={() => verifyPassword(passwordPopup.callback)}
-              className="w-full bg-blue-500 text-white p-3 rounded-xl font-semibold hover:bg-blue-600"
-            >
-              Confirm
-            </button>
+            <input type="password" placeholder="Password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') verifyPassword(passwordPopup.callback); }} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none" autoFocus />
+            {passwordError && <p className="text-red-500 text-sm mb-4">{passwordError}</p>}
+            <button onClick={() => verifyPassword(passwordPopup.callback)} className="w-full bg-blue-500 text-white p-3 rounded-xl font-semibold hover:bg-blue-600">Confirm</button>
           </div>
         </div>
       )}
 
       {/* Context Menu */}
       {contextMenu && (
-        <div
-          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={handleToggleFavorite}
-            className="w-full px-4 py-2 text-left hover:bg-yellow-100 text-gray-700"
-          >
-            {(contextMenu.type === 'category' && isCategoryFavorite(contextMenu.item.id)) ||
-             (contextMenu.type === 'tile' && isTileFavorite(contextMenu.categoryId, contextMenu.item.id))
-              ? '⭐ Remove from Favorites'
-              : '⭐ Add to Favorites'}
+        <div className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}>
+          <button onClick={handleToggleFavorite} className="w-full px-4 py-2 text-left hover:bg-yellow-100 text-gray-700">
+            {(contextMenu.type === 'category' && isCategoryFavorite(contextMenu.item.id)) || (contextMenu.type === 'tile' && isTileFavorite(contextMenu.categoryId, contextMenu.item.id)) ? '⭐ Remove from Favorites' : '⭐ Add to Favorites'}
           </button>
-          <button
-            onClick={handleChangeImage}
-            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700"
-          >
-            Change Image
-          </button>
-          {!contextMenu.item.isDefault && contextMenu.item.customImage && (
-            <button
-              onClick={handleDeleteImage}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700"
-            >
-              Delete Image
-            </button>
-          )}
+          <button onClick={handleChangeImage} className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700">Change Image</button>
+          {!contextMenu.item.isDefault && contextMenu.item.customImage && <button onClick={handleDeleteImage} className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700">Delete Image</button>}
           {contextMenu.type === 'category' && !contextMenu.item.isDefault && (
             <>
-              <button
-                onClick={handleChangeName}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700"
-              >
-                Change Category Name
-              </button>
-              <button
-                onClick={handleChangeStem}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700"
-              >
-                Change Sentence Stem
-              </button>
-              <button
-                onClick={handleDeleteCategory}
-                className="w-full px-4 py-2 text-left hover:bg-red-100 text-red-600"
-              >
-                Delete Category
-              </button>
+              <button onClick={handleChangeName} className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700">Change Category Name</button>
+              <button onClick={handleChangeStem} className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700">Change Sentence Stem</button>
+              <button onClick={handleDeleteCategory} className="w-full px-4 py-2 text-left hover:bg-red-100 text-red-600">Delete Category</button>
             </>
           )}
           {contextMenu.type === 'tile' && !contextMenu.item.isDefault && (
             <>
-              <button
-                onClick={handleChangeName}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700"
-              >
-                Change Tile Name
-              </button>
-              <button
-                onClick={handleDeleteTile}
-                className="w-full px-4 py-2 text-left hover:bg-red-100 text-red-600"
-              >
-                Delete Tile
-              </button>
+              <button onClick={handleChangeName} className="w-full px-4 py-2 text-left hover:bg-gray-100 text-gray-700">Change Tile Name</button>
+              <button onClick={handleDeleteTile} className="w-full px-4 py-2 text-left hover:bg-red-100 text-red-600">Delete Tile</button>
             </>
           )}
         </div>
@@ -1704,92 +1286,34 @@ const handleGenerateMoreTiles = async () => {
       {popup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md relative">
-            <button
-              onClick={() => {
-                setPopup(null);
-                setNewCategoryForm({ name: '', image: null, stem: '' });
-                setNewTileForm({ name: '', image: null });
-                setEditForm({ value: '', image: null });
-                setCategoryError('');
-                setTileError('');
-              }}
-              className="absolute top-4 right-4 text-red-500 text-2xl font-bold hover:text-red-700"
-            >
-              ×
-            </button>
+            <button onClick={() => { setPopup(null); setNewCategoryForm({ name: '', image: null, stem: '' }); setNewTileForm({ name: '', image: null }); setEditForm({ value: '', image: null }); setCategoryError(''); setTileError(''); }} className="absolute top-4 right-4 text-red-500 text-2xl font-bold hover:text-red-700">×</button>
 
             {popup.type === 'createCategory' && (
               <>
                 <h3 className="text-xl font-bold mb-4">Create Category</h3>
-                <input
-                  type="text"
-                  placeholder="New category name"
-                  value={newCategoryForm.name}
-                  onChange={(e) => setNewCategoryForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none"
-                />
+                <input type="text" placeholder="New category name" value={newCategoryForm.name} onChange={(e) => setNewCategoryForm(prev => ({ ...prev, name: e.target.value }))} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none" />
                 <label className="block mb-4">
-                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-200 inline-block">
-                    Upload Image <span className="text-red-500">*</span>
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, 'newCategory')}
-                    className="hidden"
-                  />
+                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-200 inline-block">Upload Image <span className="text-red-500">*</span></span>
+                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'newCategory')} className="hidden" />
                   {newCategoryForm.image && <span className="ml-2 text-green-600">✓ Image uploaded</span>}
                 </label>
-                <input
-                  type="text"
-                  placeholder="Create sentence stem (e.g., 'I need help with ')"
-                  value={newCategoryForm.stem}
-                  onChange={(e) => setNewCategoryForm(prev => ({ ...prev, stem: e.target.value }))}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none"
-                />
-                {categoryError && (
-                  <p className="text-red-500 text-sm mb-4">{categoryError}</p>
-                )}
-                <button
-                  onClick={createCategory}
-                  className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600"
-                >
-                  Confirm
-                </button>
+                <input type="text" placeholder="Create sentence stem (e.g., 'I need help with ')" value={newCategoryForm.stem} onChange={(e) => setNewCategoryForm(prev => ({ ...prev, stem: e.target.value }))} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none" />
+                {categoryError && <p className="text-red-500 text-sm mb-4">{categoryError}</p>}
+                <button onClick={createCategory} className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600">Confirm</button>
               </>
             )}
 
             {popup.type === 'createTile' && (
               <>
                 <h3 className="text-xl font-bold mb-4">Create Tile</h3>
-                <input
-                  type="text"
-                  placeholder="Create tile name"
-                  value={newTileForm.name}
-                  onChange={(e) => setNewTileForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none"
-                />
+                <input type="text" placeholder="Create tile name" value={newTileForm.name} onChange={(e) => setNewTileForm(prev => ({ ...prev, name: e.target.value }))} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none" />
                 <label className="block mb-4">
-                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-200 inline-block">
-                    Upload Image <span className="text-red-500">*</span>
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, 'newTile')}
-                    className="hidden"
-                  />
+                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-200 inline-block">Upload Image <span className="text-red-500">*</span></span>
+                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'newTile')} className="hidden" />
                   {newTileForm.image && <span className="ml-2 text-green-600">✓ Image uploaded</span>}
                 </label>
-                {tileError && (
-                  <p className="text-red-500 text-sm mb-4">{tileError}</p>
-                )}
-                <button
-                  onClick={createTile}
-                  className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600"
-                >
-                  Confirm
-                </button>
+                {tileError && <p className="text-red-500 text-sm mb-4">{tileError}</p>}
+                <button onClick={createTile} className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600">Confirm</button>
               </>
             )}
 
@@ -1797,84 +1321,37 @@ const handleGenerateMoreTiles = async () => {
               <>
                 <h3 className="text-xl font-bold mb-4">Change Image</h3>
                 <label className="block mb-4">
-                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-200 inline-block">
-                    Attach Image
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, 'edit')}
-                    className="hidden"
-                  />
+                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-200 inline-block">Attach Image</span>
+                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'edit')} className="hidden" />
                   {editForm.image && <span className="ml-2 text-green-600">✓ Image uploaded</span>}
                 </label>
-                <button
-                  onClick={applyImageChange}
-                  className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600"
-                  disabled={!editForm.image}
-                >
-                  Confirm
-                </button>
+                <button onClick={applyImageChange} className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600" disabled={!editForm.image}>Confirm</button>
               </>
             )}
 
             {popup.type === 'changeName' && (
               <>
                 <h3 className="text-xl font-bold mb-4">Change Name</h3>
-                <input
-                  type="text"
-                  placeholder="New name"
-                  value={editForm.value}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, value: e.target.value }))}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none"
-                />
-                <button
-                  onClick={applyNameChange}
-                  className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600"
-                >
-                  Confirm
-                </button>
+                <input type="text" placeholder="New name" value={editForm.value} onChange={(e) => setEditForm(prev => ({ ...prev, value: e.target.value }))} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none" />
+                <button onClick={applyNameChange} className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600">Confirm</button>
               </>
             )}
 
             {popup.type === 'changeStem' && (
               <>
                 <h3 className="text-xl font-bold mb-4">Change Sentence Stem</h3>
-                <input
-                  type="text"
-                  placeholder="New sentence stem"
-                  value={editForm.value}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, value: e.target.value }))}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none"
-                />
-                <button
-                  onClick={applyStemChange}
-                  className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600"
-                >
-                  Confirm
-                </button>
+                <input type="text" placeholder="New sentence stem" value={editForm.value} onChange={(e) => setEditForm(prev => ({ ...prev, value: e.target.value }))} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-blue-400 focus:outline-none" />
+                <button onClick={applyStemChange} className="w-full bg-green-500 text-white p-3 rounded-xl font-semibold hover:bg-green-600">Confirm</button>
               </>
             )}
 
             {popup.type === 'confirmDeleteCategory' && (
               <>
                 <h3 className="text-xl font-bold mb-4 text-red-600">Delete Category</h3>
-                <p className="text-gray-700 mb-6">
-                  Deleting this category is permanent. Would you like to delete it?
-                </p>
+                <p className="text-gray-700 mb-6">Deleting this category is permanent. Would you like to delete it?</p>
                 <div className="flex gap-4">
-                  <button
-                    onClick={confirmDeleteCategory}
-                    className="flex-1 bg-red-500 text-white p-3 rounded-xl font-semibold hover:bg-red-600"
-                  >
-                    Delete Anyway
-                  </button>
-                  <button
-                    onClick={() => setPopup(null)}
-                    className="flex-1 bg-gray-200 text-gray-700 p-3 rounded-xl font-semibold hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={confirmDeleteCategory} className="flex-1 bg-red-500 text-white p-3 rounded-xl font-semibold hover:bg-red-600">Delete Anyway</button>
+                  <button onClick={() => setPopup(null)} className="flex-1 bg-gray-200 text-gray-700 p-3 rounded-xl font-semibold hover:bg-gray-300">Cancel</button>
                 </div>
               </>
             )}
