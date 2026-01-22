@@ -16,6 +16,6 @@ Categorized Vocabulary: Organized sets of words and phrases (e.g., Needs, Emotio
 
 Text-to-Speech (TTS) Integration: Converts selected icons into audible speech to facilitate real-time conversation.
 
-Responsive Design: Fully accessible on tablets and desktop computers, which are commonly used in therapeutic settings.
+Fully Customizable Interface: Users and caregivers can add new tiles and upload custom images to represent specific people, places, or objects unique to the user’s life.
 
 User Authentication: Secure login for caregivers and users to maintain personalized communication boards.
